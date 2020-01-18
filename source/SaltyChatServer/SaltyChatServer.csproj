@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netcoreapp3.0</TargetFramework>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!--Use latest version from https://www.nuget.org/packages/AltV.Net-->
+		<PackageReference Include="AltV.Net" Version="1.22.5-beta" />
+	</ItemGroup>
+
+	<!--This copies the publish directory to the resource folder which is named "my-server"-->
+
+	<ItemGroup>
+		<AllOutputFiles Include="$(OutputPath)\publish\*.*" />
+	</ItemGroup>
+
+	<Target Name="CopyFiles" AfterTargets="publish">
+		<PropertyGroup>
+			<CopiedFiles>$(OutputPath)\publish\*.*</CopiedFiles>
+
+			<TargetLocation Condition=" '$(Configuration)' == 'Release' ">../../my-server/</TargetLocation>
+		</PropertyGroup>
+		<Copy Condition=" '$(TargetLocation)' != '' " SourceFiles="@(AllOutputFiles)" DestinationFolder="$(TargetLocation)" SkipUnchangedFiles="false" />
+	</Target>
+
+</Project>
