@@ -86,7 +86,7 @@
             if (!isConnected || typeof command !== "string")
                 return;
             
-            //webSocket.send(command);
+            webSocket.send(command);
 
             packetsSent++;
             lastCommand = command;
