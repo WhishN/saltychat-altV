@@ -178,13 +178,16 @@ class VoiceManager {
             this.VoiceClients.delete(playerId);
         }
     }
-    OnPlayerTalking = (player, isTalking) => {
-        if (player !== alt.Player.local.id)
-        return;
+    OnPlayerTalking = (playerId, isTalking) => {
+        let target = alt.Player.local
+        if (playerId !== alt.Player.local.id)
+            target = alt.Player.all.find(p => {
+                return (p.id == playerId)
+            })
         if (isTalking)
-            playFacialAnim(alt.Player.local, "mp_facial", "mic_chatter")
+            native.playFacialAnim(target.scriptID, "mp_facial", "mic_chatter")
         else
-            playFacialAnim(alt.Player.local, "facials@gen_male@variations@normal", "mood_normal_1")
+            native.playFacialAnim(target.scriptID, "facials@gen_male@variations@normal", "mood_normal_1")
     }
     OnPlayerDied = (playerHandle) => {
         let playerId = parseInt(playerHandle.id);
