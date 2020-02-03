@@ -17,6 +17,6 @@ If you use Javascript Serverside you need to emit 2 things:
 // This ones for SaltyChat.dll to apply player
 alt.emit("PlayerLoggedIn", player, playerName)
 
-// This ones for the Client to confirm server has Registered the Player
-alt.emitClient(player, "SaltyChat_OnConnected")
+// This ones for the Client to confirm WebSocket has Connected
+alt.emit(player, "SaltyChat_OnConnected")
 ```
