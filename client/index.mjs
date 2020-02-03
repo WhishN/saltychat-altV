@@ -185,9 +185,9 @@ class VoiceManager {
                 return (p.id == player)
             })
         if (isTalking)
-            native.playFacialAnim(target.scriptID, "mp_facial", "mic_chatter")
+            native.playFacialAnim(target.scriptID, "mic_chatter", "mp_facial")
         else
-            native.playFacialAnim(target.scriptID, "facials@gen_male@variations@normal", "mood_normal_1")
+            native.playFacialAnim(target.scriptID, "mood_normal_1", "facials@gen_male@variations@normal")
     }
     OnPlayerDied = (playerHandle) => {
         let playerId = parseInt(playerHandle.id);
