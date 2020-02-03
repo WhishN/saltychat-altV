@@ -180,9 +180,9 @@ class VoiceManager {
     }
     OnPlayerTalking = (playerId, isTalking) => {
         let target = alt.Player.local
-        if (playerId !== alt.Player.local.id)
+        if (player !== alt.Player.local.id)
             target = alt.Player.all.find(p => {
-                return (p.id == playerId)
+                return (p.id == player)
             })
         if (isTalking)
             native.playFacialAnim(target.scriptID, "mp_facial", "mic_chatter")
