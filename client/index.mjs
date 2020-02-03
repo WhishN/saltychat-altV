@@ -178,7 +178,7 @@ class VoiceManager {
             this.VoiceClients.delete(playerId);
         }
     }
-    OnPlayerTalking = (playerId, isTalking) => {
+    OnPlayerTalking = (player, isTalking) => {
         let target = alt.Player.local
         if (player !== alt.Player.local.id)
             target = alt.Player.all.find(p => {
