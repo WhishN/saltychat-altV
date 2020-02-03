@@ -348,8 +348,14 @@ class VoiceManager {
         this.ExecuteCommand(new PluginCommand(Command.StopSound, this.ServerUniqueIdentifier, new Sound(handle, false, handle)));
     }
     Initiate = () => {
-        this.ExecuteCommand(new PluginCommand(Command.Initiate, this.ServerUniqueIdentifier, new GameInstance(this.ServerUniqueIdentifier, this.TeamSpeakName, this.IngameChannel, this.IngameChannelPassword, this.SoundPack)));
-        alt.emitServer("SaltyChat_SetVoiceRange", alt.Player.local, 3)
+        if(this.IsEnabled) {
+            this.ExecuteCommand(new PluginCommand(Command.Initiate, this.ServerUniqueIdentifier, new GameInstance(this.ServerUniqueIdentifier, this.TeamSpeakName, this.IngameChannel, this.IngameChannelPassword, this.SoundPack)));
+            alt.emitServer("SaltyChat_SetVoiceRange", alt.Player.local, 3)
+        } else {
+            alt.setTimeout(() => {
+                this.Initiate()
+            }, 500);
+        }
     }
     PlayerStateUpdate = () => {
         let playerPosition = alt.Player.local.pos;
@@ -397,7 +403,7 @@ alt.onServer("SaltyChat_UpdateRadioTowers", voiceManager.OnUpdateRadioTowers); /
 webView.on("SaltyChat_OnDisconnected", voiceManager.OnPluginDisconnected); //());
 webView.on("SaltyChat_OnMessage", voiceManager.OnPluginMessage); //(messageJson));
 webView.on("SaltyChat_OnError", voiceManager.OnPluginError); //(errorJson));
-alt.onServer("SaltyChat_OnConnected", voiceManager.OnPluginConnected); //());
+webview.on("SaltyChat_OnConnected", voiceManager.OnPluginConnected); //());
 alt.onServer("SaltyChat_OnDisconnected", voiceManager.OnPluginDisconnected); //());
 alt.onServer("SaltyChat_OnMessage", voiceManager.OnPluginMessage); //(messageJson));
 alt.onServer("SaltyChat_OnError", voiceManager.OnPluginError); //(errorJson));
