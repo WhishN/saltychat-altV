@@ -10,8 +10,7 @@ namespace SaltyChatServer
         #region Props/Fields
         internal string Name { get; }
 
-        internal RadioChannelMember[] Members => this._members.ToArray();
-        private List<RadioChannelMember> _members = new List<RadioChannelMember>();
+        internal List<RadioChannelMember> Members { get; } = new List<RadioChannelMember>();
         #endregion
 
         #region CTOR
@@ -20,7 +19,7 @@ namespace SaltyChatServer
             this.Name = name;
 
             if (members != null)
-                this._members.AddRange(members);
+                this.Members.AddRange(members);
         }
         #endregion
 
@@ -32,15 +31,15 @@ namespace SaltyChatServer
 
         internal void AddMember(VoiceClient voiceClient)
         {
-            lock (this._members)
+            lock (this.Members)
             {
-                if (!this._members.Any(m => m.VoiceClient == voiceClient))
+                if (!this.Members.Any(m => m.VoiceClient == voiceClient))
                 {
-                    this._members.Add(new RadioChannelMember(this, voiceClient));
+                    this.Members.Add(new RadioChannelMember(this, voiceClient));
 
                     voiceClient.Player.Emit(Event.SaltyChat_SetRadioChannel, this.Name);
 
-                    foreach (RadioChannelMember member in this._members.Where(m => m.IsSending))
+                    foreach (RadioChannelMember member in this.Members.Where(m => m.IsSending))
                     {
                         voiceClient.Player.Emit(Event.SaltyChat_IsSending, member.VoiceClient.Player.Id, true);
                     }
@@ -50,9 +49,9 @@ namespace SaltyChatServer
 
         internal void RemoveMember(VoiceClient voiceClient)
         {
-            lock (this._members)
+            lock (this.Members)
             {
-                RadioChannelMember member = this._members.FirstOrDefault(m => m.VoiceClient == voiceClient);
+                RadioChannelMember member = this.Members.FirstOrDefault(m => m.VoiceClient == voiceClient);
 
                 if (member != null)
                 {
@@ -60,24 +59,24 @@ namespace SaltyChatServer
                     {
                         if (member.VoiceClient.RadioSpeaker)
                         {
-                            foreach (VoiceClient client in VoiceManager.VoiceClients)
+                            foreach (VoiceClient client in VoiceManager.VoiceClients.Values)
                             {
                                 client.Player.Emit(Event.SaltyChat_IsSendingRelayed, voiceClient.Player.Id, false, true, false, "{}");
                             }
                         }
                         else
                         {
-                            foreach (RadioChannelMember channelMember in this._members)
+                            foreach (RadioChannelMember channelMember in this.Members)
                             {
                                 channelMember.VoiceClient.Player.Emit(Event.SaltyChat_IsSending, voiceClient.Player.Id, false);
                             }
                         }
                     }
 
-                    this._members.Remove(member);
+                    this.Members.Remove(member);
                     voiceClient.Player.Emit(Event.SaltyChat_SetRadioChannel, "");
 
-                    foreach (RadioChannelMember channelMember in this._members.Where(m => m.IsSending))
+                    foreach (RadioChannelMember channelMember in this.Members.Where(m => m.IsSending))
                     {
                         voiceClient.Player.Emit(Event.SaltyChat_IsSending, channelMember.VoiceClient.Player.Id, false);
                     }
@@ -93,21 +92,20 @@ namespace SaltyChatServer
             bool stateChanged = radioChannelMember.IsSending != isSending;
             radioChannelMember.IsSending = isSending;
 
-            RadioChannelMember[] channelMembers = this.Members;
-            RadioChannelMember[] onSpeaker = channelMembers.Where(m => m.VoiceClient.RadioSpeaker && m.VoiceClient != voiceClient).ToArray();
+            List<RadioChannelMember> onSpeaker = this.Members.Where(m => m.VoiceClient.RadioSpeaker && m.VoiceClient != voiceClient).ToList();
 
-            if (onSpeaker.Length > 0)
+            if (onSpeaker.Count > 0)
             {
                 string[] channelMemberNames = onSpeaker.Select(m => m.VoiceClient.TeamSpeakName).ToArray();
 
-                foreach (VoiceClient remoteClient in VoiceManager.VoiceClients)
+                foreach (VoiceClient remoteClient in VoiceManager.VoiceClients.Values)
                 {
                     remoteClient.Player.Emit(Event.SaltyChat_IsSendingRelayed, voiceClient.Player.Id, isSending, stateChanged, this.IsMember(remoteClient), JsonSerializer.Serialize<string[]>(channelMemberNames));
                 }
             }
             else
             {
-                foreach (RadioChannelMember member in channelMembers)
+                foreach (RadioChannelMember member in this.Members)
                 {
                     member.VoiceClient.Player.Emit(Event.SaltyChat_IsSending, voiceClient.Player.Id, isSending, stateChanged);
                 }

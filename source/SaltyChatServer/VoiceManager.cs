@@ -25,11 +25,9 @@ namespace SaltyChatServer
             new Vector3(-448.2019f, 6019.807f, 36.62916f)
         };
 
-        public static VoiceClient[] VoiceClients => VoiceManager._voiceClients.Values.ToArray();
-        private static Dictionary<IPlayer, VoiceClient> _voiceClients = new Dictionary<IPlayer, VoiceClient>();
+        internal static Dictionary<IPlayer, VoiceClient> VoiceClients { get; private set; } = new Dictionary<IPlayer, VoiceClient>();
 
-        public static RadioChannel[] RadioChannels => VoiceManager._radioChannels.ToArray();
-        private static List<RadioChannel> _radioChannels = new List<RadioChannel>();
+        private static List<RadioChannel> RadioChannels { get; set; } = new List<RadioChannel>();
         #endregion
 
         #region Server Events
@@ -49,9 +47,9 @@ namespace SaltyChatServer
         {
             VoiceClient voiceClient = new VoiceClient(client, VoiceManager.GetTeamSpeakName(), SharedData.VoiceRanges[0]);
 
-            lock (VoiceManager._voiceClients)
+            lock (VoiceManager.VoiceClients)
             {
-                VoiceManager._voiceClients.Add(client, voiceClient);
+                VoiceManager.VoiceClients.Add(client, voiceClient);
             }
             //Console.WriteLine($"{client} connected");
 
@@ -63,12 +61,12 @@ namespace SaltyChatServer
         {
             VoiceClient voiceClient;
 
-            lock (VoiceManager._voiceClients)
+            lock (VoiceManager.VoiceClients)
             {
-                if (!VoiceManager._voiceClients.TryGetValue(client, out voiceClient))
+                if (!VoiceManager.VoiceClients.TryGetValue(client, out voiceClient))
                     return;
 
-                VoiceManager._voiceClients.Remove(client);
+                VoiceManager.VoiceClients.Remove(client);
             }
 
             foreach (RadioChannel radioChannel in VoiceManager.RadioChannels.Where(c => c.IsMember(voiceClient)))
@@ -76,7 +74,7 @@ namespace SaltyChatServer
                 radioChannel.RemoveMember(voiceClient);
             }
 
-            foreach (VoiceClient cl in VoiceManager.VoiceClients)
+            foreach (VoiceClient cl in VoiceManager.VoiceClients.Values)
             {
                 cl.Player.Emit(Event.SaltyChat_Disconnected, voiceClient.Player.Id);
             }
@@ -100,7 +98,7 @@ namespace SaltyChatServer
                 return;
             }
 
-            foreach (VoiceClient cl in VoiceManager.VoiceClients)
+            foreach (VoiceClient cl in VoiceManager.VoiceClients.Values)
             {
                 player.Emit(Event.SaltyChat_UpdateClient, cl.Player.Id, cl.TeamSpeakName, cl.VoiceRange);
 
@@ -115,7 +113,7 @@ namespace SaltyChatServer
             if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            foreach (VoiceClient client in VoiceManager.VoiceClients)
+            foreach (VoiceClient client in VoiceManager.VoiceClients.Values)
             {
                 client.Player.Emit(Event.SaltyChat_IsTalking, player.Id, isTalking);
             }
@@ -134,7 +132,7 @@ namespace SaltyChatServer
             {
                 voiceClient.VoiceRange = voiceRange;
 
-                foreach (VoiceClient client in VoiceManager.VoiceClients)
+                foreach (VoiceClient client in VoiceManager.VoiceClients.Values)
                 {
                     client.Player.Emit(Event.SaltyChat_UpdateClient, player.Id, voiceClient.TeamSpeakName, voiceClient.VoiceRange);
                 }
@@ -193,7 +191,7 @@ namespace SaltyChatServer
         {
             RadioChannel radioChannel;
 
-            lock (VoiceManager._radioChannels)
+            lock (VoiceManager.RadioChannels)
             {
                 radioChannel = VoiceManager.RadioChannels.FirstOrDefault(r => r.Name == name);
 
@@ -201,7 +199,7 @@ namespace SaltyChatServer
                 {
                     radioChannel = new RadioChannel(name);
 
-                    VoiceManager._radioChannels.Add(radioChannel);
+                    VoiceManager.RadioChannels.Add(radioChannel);
                 }
             }
 
@@ -254,9 +252,9 @@ namespace SaltyChatServer
             {
                 radioChannel.RemoveMember(voiceClient);
 
-                if (radioChannel.Members.Length == 0)
+                if (radioChannel.Members.Count == 0)
                 {
-                    VoiceManager._radioChannels.Remove(radioChannel);
+                    VoiceManager.RadioChannels.Remove(radioChannel);
                 }
             }
         }
@@ -280,7 +278,7 @@ namespace SaltyChatServer
         {
             string name;
 
-            lock (VoiceManager._voiceClients)
+            lock (VoiceManager.VoiceClients)
             {
                 do
                 {
@@ -291,7 +289,7 @@ namespace SaltyChatServer
                         name = name.Remove(29, name.Length - 30);
                     }
                 }
-                while (VoiceManager._voiceClients.Values.Any(c => c.TeamSpeakName == name));
+                while (VoiceManager.VoiceClients.Values.Any(c => c.TeamSpeakName == name));
             }
 
             return name;
@@ -350,9 +348,9 @@ namespace SaltyChatServer
         #region Helper
         public static bool TryGetVoiceClient(IPlayer client, out VoiceClient voiceClient)
         {
-            lock (VoiceManager._voiceClients)
+            lock (VoiceManager.VoiceClients)
             {
-                if (VoiceManager._voiceClients.TryGetValue(client, out voiceClient))
+                if (VoiceManager.VoiceClients.TryGetValue(client, out voiceClient))
                     return true;
             }
 
