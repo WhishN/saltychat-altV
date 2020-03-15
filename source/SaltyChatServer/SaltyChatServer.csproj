@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>netcoreapp3.0</TargetFramework>
+		<TargetFramework>netcoreapp3.1</TargetFramework>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<!--Use latest version from https://www.nuget.org/packages/AltV.Net-->
-		<PackageReference Include="AltV.Net" Version="1.22.5-beta" />
+		<PackageReference Include="AltV.Net" Version="1.27.4" />
 	</ItemGroup>
 
 	<!--This copies the publish directory to the resource folder which is named "my-server"-->
