@@ -17,6 +17,10 @@ var Command;
     Command[Command["StopRadioCommunication"] = 11] = "StopRadioCommunication";
     Command[Command["PlaySound"] = 12] = "PlaySound";
     Command[Command["StopSound"] = 13] = "StopSound";
+    Command[Command["BulkUpdate"] = 14] = "BulkUpdate";
+    Command[Command["TalkStateChange"] = 15] = "TalkStateChange";
+    Command[Command["MegaphoneCommunicationUpdate"] = 16] = "MegaphoneCommunicationUpdate";
+    Command[Command["StopMegaphoneCommunication"] = 17] = "StopMegaphoneCommunication";
 })(Command || (Command = {}));
 var PluginError;
 (function (PluginError) {
@@ -133,6 +137,7 @@ class VoiceManager {
         this.IsInGame = false;
         this.NextUpdate = Date.now();
         this.VoiceClients = new Map();
+        this.ClientIdMap = new Map();
     }
     OnInitialize = (tsName, serverIdentifier, soundPack, ingameChannel, ingameChannelPassword) => {
         this.TeamSpeakName = tsName;
@@ -166,8 +171,10 @@ class VoiceManager {
                 let player = alt.Player.all.find(p => {
                     return (p.id == playerId);
                 })
-                if(player != undefined)
+                if(player != undefined) {
                     this.VoiceClients.set(playerId, new VoiceClient(player, tsName, voiceRange, true));
+                    this.ClientIdMap.set(tsName, playerId);
+                }
             }
         }
     }
@@ -176,18 +183,20 @@ class VoiceManager {
             let voiceClient = this.VoiceClients.get(playerId);
             this.ExecuteCommand(new PluginCommand(Command.RemovePlayer, this.ServerUniqueIdentifier, new PlayerState(voiceClient.TeamSpeakName, null, null, null, false, null)));
             this.VoiceClients.delete(playerId);
+            this.ClientIdMap.delete(voiceClient.TeamSpeakName);
         }
     }
-    OnPlayerTalking = (player, isTalking) => {
-        let target = alt.Player.local
-        if (player !== alt.Player.local.id)
-            target = alt.Player.all.find(p => {
-                return (p.id == player)
-            })
+    OnPlayerTalking = (TsName, isTalking) => {
+        let voiceClient = null;
+        if(TsName == null) {
+            voiceClient = alt.Player.local
+        } else {
+            voiceClient = this.VoiceClients.get(this.ClientIdMap.get(TsName)).Player;
+        }
         if (isTalking)
-            native.playFacialAnim(target.scriptID, "mic_chatter", "mp_facial")
+            native.playFacialAnim(voiceClient.scriptID, "mic_chatter", "mp_facial")
         else
-            native.playFacialAnim(target.scriptID, "mood_normal_1", "facials@gen_male@variations@normal")
+            native.playFacialAnim(voiceClient.scriptID, "mood_normal_1", "facials@gen_male@variations@normal")
     }
     OnPlayerDied = (playerHandle) => {
         let playerId = parseInt(playerHandle.id);
@@ -292,6 +301,12 @@ class VoiceManager {
             this.ExecuteCommand(new PluginCommand(Command.Pong, this.ServerUniqueIdentifier, null));
             return;
         }
+        if(message.Command == Command.TalkStateChange) {
+            this.OnPlayerTalking(message.Parameter.Name, message.Parameter.IsTalking)
+        }
+        if(message.Command == Command.StateUpdate) {
+            this.OnPlayerTalking(null, message.Parameter.IsTalking)
+        }
         if (message.Parameter === typeof ('undefined') || message.Parameter == null)
             return;
         let parameter = message.Parameter;
@@ -299,10 +314,10 @@ class VoiceManager {
             alt.emitServer("SaltyChat_CheckVersion", parameter.UpdateBranch, parameter.Version);
             this.IsInGame = parameter.IsReady;
         }
-        if (parameter.IsTalking != this.IsTalking) {
+        /* if (parameter.IsTalking != this.IsTalking) {
             this.IsTalking = parameter.IsTalking;
             alt.emitServer("SaltyChat_IsTalking", this.IsTalking);
-        }
+        } */
         if (parameter.IsMicrophoneMuted != this.IsMicrophoneMuted) {
             this.IsMicrophoneMuted = parameter.IsMicrophoneMuted;
         }
@@ -390,7 +405,7 @@ VoiceManager.VoiceRanges = [3.0, 8.0, 15.0, 32.0];
 alt.onServer("SaltyChat_Initialize", voiceManager.OnInitialize); //(tsName, serverIdentifier, soundPack, ingameChannel, ingameChannelPassword));
 alt.onServer("SaltyChat_UpdateClient", voiceManager.OnUpdateVoiceClient); //(playerHandle, tsName, voiceRange));
 alt.onServer("SaltyChat_Disconnected", voiceManager.OnPlayerDisconnect); //(playerHandle));
-alt.onServer("SaltyChat_IsTalking", voiceManager.OnPlayerTalking); //(playerHandle, isTalking));
+//alt.onServer("SaltyChat_IsTalking", voiceManager.OnPlayerTalking); //(playerHandle, isTalking));
 alt.onServer("SaltyChat_PlayerDied", voiceManager.OnPlayerDied); //(playerHandle));
 alt.onServer("SaltyChat_PlayerRevived", voiceManager.OnPlayerRevived); //(playerHandle));
 alt.onServer("SaltyChat_EstablishedCall", voiceManager.OnEstablishCall); //(playerHandle));
