@@ -1,55 +1,58 @@
 import * as alt from 'alt'
 import * as native from 'natives'
 
-var Command;
-(function (Command) {
-    Command[Command["Initiate"] = 0] = "Initiate";
-    Command[Command["Ping"] = 1] = "Ping";
-    Command[Command["Pong"] = 2] = "Pong";
-    Command[Command["StateUpdate"] = 3] = "StateUpdate";
-    Command[Command["SelfStateUpdate"] = 4] = "SelfStateUpdate";
-    Command[Command["PlayerStateUpdate"] = 5] = "PlayerStateUpdate";
-    Command[Command["RemovePlayer"] = 6] = "RemovePlayer";
-    Command[Command["PhoneCommunicationUpdate"] = 7] = "PhoneCommunicationUpdate";
-    Command[Command["StopPhoneCommunication"] = 8] = "StopPhoneCommunication";
-    Command[Command["RadioTowerUpdate"] = 9] = "RadioTowerUpdate";
-    Command[Command["RadioCommunicationUpdate"] = 10] = "RadioCommunicationUpdate";
-    Command[Command["StopRadioCommunication"] = 11] = "StopRadioCommunication";
-    Command[Command["PlaySound"] = 12] = "PlaySound";
-    Command[Command["StopSound"] = 13] = "StopSound";
-    Command[Command["BulkUpdate"] = 14] = "BulkUpdate";
-    Command[Command["TalkStateChange"] = 15] = "TalkStateChange";
-    Command[Command["MegaphoneCommunicationUpdate"] = 16] = "MegaphoneCommunicationUpdate";
-    Command[Command["StopMegaphoneCommunication"] = 17] = "StopMegaphoneCommunication";
-})(Command || (Command = {}));
-var PluginError;
-(function (PluginError) {
-    PluginError[PluginError["OK"] = 0] = "OK";
-    PluginError[PluginError["InvalidJson"] = 1] = "InvalidJson";
-    PluginError[PluginError["NotConnectedToServer"] = 2] = "NotConnectedToServer";
-    PluginError[PluginError["AlreadyInGame"] = 3] = "AlreadyInGame";
-    PluginError[PluginError["ChannelNotAvailable"] = 4] = "ChannelNotAvailable";
-    PluginError[PluginError["NameNotAvailable"] = 5] = "NameNotAvailable";
-    PluginError[PluginError["InvalidValue"] = 6] = "InvalidValue";
-})(PluginError || (PluginError = {}));
-var UpdateBranch;
-(function (UpdateBranch) {
-    UpdateBranch[UpdateBranch["Stable"] = 0] = "Stable";
-    UpdateBranch[UpdateBranch["Testing"] = 1] = "Testing";
-    UpdateBranch[UpdateBranch["PreBuild"] = 2] = "PreBuild";
-})(UpdateBranch || (UpdateBranch = {}));
-var RadioType;
-(function (RadioType) {
-    RadioType[RadioType["None"] = 1] = "None";
-    RadioType[RadioType["ShortRange"] = 2] = "ShortRange";
-    RadioType[RadioType["LongRange"] = 4] = "LongRange";
-    RadioType[RadioType["Distributed"] = 8] = "Distributed";
-    RadioType[RadioType["UltraShortRange"] = 16] = "UltraShortRange";
-})(RadioType || (RadioType = {}));
+function LogConsole(string) {
+	alt.log(string)
+}
 
-let webView = new alt.WebView('http://resource/SaltyChat/SaltyWebSocket.html');
+const Command = {
+    Reset: -1,
+    Initiate: 0,
+    Ping: 1,
+    Pong: 2,
+    StateUpdate: 3,
+    SelfStateUpdate: 4,
+    PlayerStateUpdate: 5,
+    RemovePlayer: 6,
+    PhoneCommunicationUpdate: 7,
+    StopPhoneCommunication: 8,
+    RadioTowerUpdate: 9,
+    RadioCommunicationUpdate: 10,
+    StopRadioCommunication: 11,
+    PlaySound: 12,
+    StopSound: 13,
+    BulkUpdate: 14,
+    TalkStateChange: 15,
+    MegaphoneCommunicationUpdate: 16,
+    StopMegaphoneCommunication: 17
+}
+
+const PluginError = {
+    OK: 0,
+    InvalidJson: 1,
+    NotConnectedToServer: 2,
+    AlreadyInGame: 3,
+    ChannelNotAvailable: 4,
+    NameNotAvailable: 5,
+    InvalidValue: 6,
+}
+
+const UpdateBranch = {
+    Stable: 0,
+    Testing: 1,
+    PreBuild: 2,
+}
+
+const RadioType = {
+    None: 1,
+    ShortRange: 2,
+    LongRange: 4,
+    Distributed: 8,
+    UltraShortRange: 16,
+}
+
+let webView = new alt.WebView('http://resource/Client/SaltyWebSocket.html');
 webView.unfocus();
-webView.isVisible = false;
 
 class PluginCommand {
     constructor(command, serverIdentifier, parameter) {
@@ -68,6 +71,7 @@ class GameInstance {
         this.ChannelId = channelId;
         this.ChannelPassword = channelPassword;
         this.SoundPack = soundPack;
+        this.SwissChannelIds = []
     }
 }
 class PlayerState {
@@ -78,6 +82,7 @@ class PlayerState {
         this.VoiceRange = voiceRange;
         this.IsAlive = isAlive;
         this.VolumeOverride = volumeOverride;
+        this.Direct = true
     }
 }
 class PhoneCommunication {
@@ -120,8 +125,10 @@ class VoiceClient {
         this.IsAlive = isAlive;
     }
 }
+
 class VoiceManager {
-    constructor() {
+    constructor()
+    {
         this.IsEnabled = false;
         this.ServerUniqueIdentifier = null;
         this.SoundPack = null;
@@ -136,10 +143,12 @@ class VoiceManager {
         this.IsConnected = false;
         this.IsInGame = false;
         this.NextUpdate = Date.now();
-        this.VoiceClients = new Map();
-        this.ClientIdMap = new Map();
+        this.VoiceClients = [];
+        this.RadioTowers = [];
+        this.VoiceRanges = [3, 8, 15, 32]
     }
-    OnInitialize = (tsName, serverIdentifier, soundPack, ingameChannel, ingameChannelPassword) => {
+    OnInitialize = (tsName, serverIdentifier, soundPack, ingameChannel, ingameChannelPassword) =>
+    {
         this.TeamSpeakName = tsName;
         this.ServerUniqueIdentifier = serverIdentifier;
         this.SoundPack = soundPack;
@@ -147,261 +156,341 @@ class VoiceManager {
         this.IngameChannelPassword = ingameChannelPassword;
         this.IsEnabled = true;
     }
-    OnUpdateVoiceClient = (playerId, tsName, voiceRange) => {
-        if (playerId == null)
-        return;
+    OnUpdateVoiceClient = (playerId, tsName, voiceRange) =>
+    {
+        if(playerId == null) return;
 
-        if (playerId == alt.Player.local.id) {
-            let HudKeyValue = (voiceRange / VoiceManager.VoiceRanges[3]).toFixed(3)
-
-            alt.emit('hud:SetKeyValue', 'voice', HudKeyValue);
-
-            this.VoiceRange = voiceRange;
-            
-            alt.log("[Salty Chat] Voice Range: " + this.VoiceRange + "m");
+        if(playerId == alt.Player.local.id)
+        {
+            alt.emit("hud:SetKeyValue", "voice", voiceRange)
+            this.VoiceRange = voiceRange
+            LogConsole("[Salty Chat] Voice Range: " + this.VoiceRange + "m");
         }
-        else {
-
-            if (this.VoiceClients.has(playerId)) {
-                let voiceClient = this.VoiceClients.get(playerId);
-                voiceClient.TeamSpeakName = tsName;
-                voiceClient.VoiceRange = voiceRange;
+        else
+        {
+            let index = this.VoiceClients.findIndex(x => x.Player.id == playerId)
+            if(index >= 0)
+            {
+                this.VoiceClients[index].TeamSpeakName = tsName;
+                this.VoiceClients[index].voiceRange = voiceRange;
+                LogConsole(`Updated Voice Client ${tsName}`)
             }
-            else {
-                let player = alt.Player.all.find(p => {
-                    return (p.id == playerId);
-                })
-                if(player != undefined) {
-                    this.VoiceClients.set(playerId, new VoiceClient(player, tsName, voiceRange, true));
-                    this.ClientIdMap.set(tsName, playerId);
+            else
+            {
+                let player = alt.Player.all.find(p => p.id == playerId);
+
+                if(player != null) 
+                {
+                    this.VoiceClients.push(new VoiceClient(player, tsName, voiceRange, true));
+                    LogConsole(`Added Voice Client ${tsName}`)
                 }
             }
         }
     }
-    OnPlayerDisconnect = (playerId) => {
-        if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            this.ExecuteCommand(new PluginCommand(Command.RemovePlayer, this.ServerUniqueIdentifier, new PlayerState(voiceClient.TeamSpeakName, null, null, null, false, null)));
-            this.VoiceClients.delete(playerId);
-            this.ClientIdMap.delete(voiceClient.TeamSpeakName);
-        }
+
+    OnPlayerDisconnect = (playerId) =>
+    {
+        let index = this.VoiceClients.findIndex(x => x.Player.id == playerId);
+        if(index < 0) return;
+
+        this.ExecuteCommand(new PluginCommand(Command.RemovePlayer, this.ServerUniqueIdentifier, new PlayerState(this.VoiceClients[index].TeamSpeakName, null, null, null, false, null)));
+        LogConsole(`Removed Voice Client ${this.VoiceClients[index].TeamSpeakName}`)
+        this.VoiceClients.splice(index, 1);
     }
-    OnPlayerTalking = (TsName, isTalking) => {
-        let voiceClient = null;
-        if(TsName == null) {
-            voiceClient = alt.Player.local
-        } else {
-            voiceClient = this.VoiceClients.get(this.ClientIdMap.get(TsName)).Player;
+
+    OnPlayerDied = (player) =>
+    {
+        let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
+        if(index < 0) return;
+		
+		LogConsole(`Voice Client ${this.VoiceClient[index].TeamSpeakName} died`)
+
+        this.VoiceClients[index].isAlive = false;
+    }
+
+    OnPlayerRevived = (player) =>
+    {
+        let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
+        if(index < 0) return;
+	
+		LogConsole(`Voice Client ${this.VoiceClient[index].TeamSpeakName} revived`)
+
+        this.VoiceClients[index].isAlive = true;
+    }
+    OnEstablishCall = (player) => 
+    {
+        let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
+        if(index < 0) return;
+		
+		LogConsole(`Voice Client ${this.VoiceClient[index].TeamSpeakName} Call`)
+
+        this.ExecuteCommand(new PluginCommand(Command.PhoneCommunicationUpdate, this.ServerUniqueIdentifier, new PhoneCommunication(this.VoiceClients[index].TeamSpeakName, 0, 1.4, true, null)));
+    }
+    OnEstablishCallRelayed = (player, direct, relayJson) =>
+    {
+        let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
+        if(index < 0) return;
+
+        let relays = JSON.parse(relayJson);
+        let ownPosition = alt.Player.local.pos;
+        let playerPosition = this.VoiceClients[index].Player.pos;
+
+        this.ExecuteCommand(new PluginCommand(Command.PhoneCommunicationUpdate, this.ServerUniqueIdentifier, new PhoneCommunication(this.voiceClients[index].TeamSpeakName, 0, 1.4, direct, relays)));
+    }
+    OnEndCall = (playerId) => 
+    {
+        let index = this.VoiceClients.findIndex(x => x.Player.id == playerId);
+        if(index < 0) return;
+
+        this.ExecuteCommand(new PluginCommand(Command.StopPhoneCommunication, this.ServerUniqueIdentifier, new PhoneCommunication(this.voiceClients[index].TeamSpeakName, null, null, true, null)));
+    }
+
+    OnSetRadioChannel = (RadioChannel) => 
+    {
+        native.playSoundFrontend(-1, "CONFIRM_BEEP", "HUD_MINI_GAME_SOUNDSET", 1);
+        this.RadioChannel = RadioChannel;
+		LogConsole(`Set Radio Channel to ${RadioChannel}`)
+    }
+
+    OnPlayerIsSending = (playerId, isOnRadio, stateChange, OtherDirect = true, OtherVehicle = false) =>
+    {
+        if(playerId == alt.Player.local.id)
+        {
+            if(isOnRadio)
+                native.playSoundFromEntity(-1, "Start_Squelch", alt.Player.local.scriptID, "CB_RADIO_SFX", true, undefined)
+            else
+                native.playSoundFromEntity(-1, "End_Squelch", alt.Player.local.scriptID, "CB_RADIO_SFX", true, undefined)
         }
-        if (isTalking)
-            native.playFacialAnim(voiceClient.scriptID, "mic_chatter", "mp_facial")
         else
-            native.playFacialAnim(voiceClient.scriptID, "mood_normal_1", "facials@gen_male@variations@normal")
-    }
-    OnPlayerDied = (playerHandle) => {
-        let playerId = parseInt(playerHandle.id);
-        if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            voiceClient.IsAlive = false;
-        }
-    }
-    OnPlayerRevived = (playerHandle) => {
-        let playerId = parseInt(playerHandle.id);
-        if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            voiceClient.IsAlive = true;
-        }
-    }
-    OnEstablishCall = (player) => {
-        let playerId = parseInt(player.id);
-        if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            let ownPosition = alt.Player.local.pos;
-            let playerPosition = player.pos;
-            this.ExecuteCommand(new PluginCommand(Command.PhoneCommunicationUpdate, this.ServerUniqueIdentifier, new PhoneCommunication(voiceClient.TeamSpeakName, native.getZoneScumminess(native.getZoneAtCoords(ownPosition.x, ownPosition.y, ownPosition.z)) +
-                native.getZoneScumminess(native.getZoneAtCoords(playerPosition.x, playerPosition.y, playerPosition.z)), null, true, null)));
-        }
-    }
-    OnEstablishCallRelayed = (player, direct, relayJson) => {
-        let playerId = parseInt(player.id);
-        let relays = JSON.parse(relayJson);
-        if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            let ownPosition = alt.Player.local.pos;
-            let playerPosition = player.pos;
-            this.ExecuteCommand(new PluginCommand(Command.PhoneCommunicationUpdate, this.ServerUniqueIdentifier, new PhoneCommunication(voiceClient.TeamSpeakName, native.getZoneScumminess(native.getZoneAtCoords(ownPosition.x, ownPosition.y, ownPosition.z)) +
-                native.getZoneScumminess(native.getZoneAtCoords(playerPosition.x, playerPosition.y, playerPosition.z)), null, direct, relays)));
-       }
-    }
-    OnEndCall = (playerId) => {
-        if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            this.ExecuteCommand(new PluginCommand(Command.StopPhoneCommunication, this.ServerUniqueIdentifier, new PhoneCommunication(voiceClient.TeamSpeakName, null, null, true, null)));
-        }
-    }
-    OnSetRadioChannel = (radioChannel) => {
-        if (typeof radioChannel === "string" && radioChannel != "") {
-            this.RadioChannel = radioChannel;
-            this.PlaySound("enterRadioChannel", false, "radio");
-        }
-        else {
-            this.RadioChannel = null;
-            this.PlaySound("leaveRadioChannel", false, "radio");
-        }
-    }
-    OnPlayerIsSending = (playerHandle, isOnRadio) => {
-        let playerId = parseInt(playerHandle.id);
-        let player = playerHandle;
-        if (player == alt.Player.local) {
-            this.PlaySound("selfMicClick", false, "MicClick");
-        }
-        else if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            if (isOnRadio) {
-                this.ExecuteCommand(new PluginCommand(Command.RadioCommunicationUpdate, this.ServerUniqueIdentifier, new RadioCommunication(voiceClient.TeamSpeakName, RadioType.LongRange | RadioType.Distributed, RadioType.LongRange | RadioType.Distributed, true, null, true, null)));
+        {
+            let index = this.VoiceClients.findIndex(x => x.Player.id == playerId);
+            if(index < 0) return;
+
+            if(isOnRadio)
+            {
+                let OwnType = (alt.Player.local.vehicle && RadioCars.includes(alt.Player.local.vehicle.model) ? RadioType.LongRange : RadioType.ShortRange) | (this.Direct ? 0 : RadioType.Distributed);
+
+                let OtherType = (!OtherVehicle ? RadioType.ShortRange : RadioType.LongRange) | (OtherDirect ? 0 : RadioType.Distributed);
+
+                LogConsole(`Funkverbindung: ME[${ownType}] - OTHER[${otherType}]`)
+
+                native.playSoundFromEntity(-1, "Start_Squelch", voiceClient.Player.scriptID, "CB_RADIO_SFX", true, undefined)
+                this.ExecuteCommand(new PluginCommand(Command.RadioCommunicationUpdate, this.ServerUniqueIdentifier, new RadioCommunication(this.VoiceClients[index].TeamSpeakName, OwnType, OtherType , false, null, true, null)))
             }
-            else {
-                this.ExecuteCommand(new PluginCommand(Command.StopRadioCommunication, this.ServerUniqueIdentifier, new RadioCommunication(voiceClient.TeamSpeakName, RadioType.None, RadioType.None, true, null, true, null)));
+            else
+            {
+                native.playSoundFromEntity(-1, "End_Squelch", voiceClient.Player.scriptID, "CB_RADIO_SFX", true, undefined)
+                this.ExecuteCommand(new PluginCommand(Command.StopRadioCommunication, this.ServerUniqueIdentifier, new RadioCommunication(this.VoiceClients[index].TeamSpeakName, RadioType.None, RadioType.None, false, null, true, null)))
             }
         }
     }
-    OnPlayerIsSendingRelayed = (playerHandle, isOnRadio, stateChange, direct, relayJson) => {
-        let playerId = parseInt(playerHandle.id);
-        let relays = JSON.parse(relayJson);
-        let player = playerHandle;
-        if (player == alt.Player.local) {
-            this.PlaySound("selfMicClick", false, "MicClick");
-        }
-        else if (this.VoiceClients.has(playerId)) {
-            let voiceClient = this.VoiceClients.get(playerId);
-            if (isOnRadio) {
-                this.ExecuteCommand(new PluginCommand(Command.RadioCommunicationUpdate, this.ServerUniqueIdentifier, new RadioCommunication(voiceClient.TeamSpeakName, RadioType.LongRange | RadioType.Distributed, RadioType.LongRange | RadioType.Distributed, stateChange, null, direct, relays)));
-            }
-            else {
-                this.ExecuteCommand(new PluginCommand(Command.StopRadioCommunication, this.ServerUniqueIdentifier, new RadioCommunication(voiceClient.TeamSpeakName, RadioType.None, RadioType.None, stateChange, null, true, null)));
-            }
-        }
+
+    OnPlayerIsSendingRelayed = (playerHandle, isOnRadio, stateChange, direct, relayJson) =>
+    {
+        // To Do
+        LogConsole("This Function is to do");
     }
-    OnUpdateRadioTowers = (radioTowerJson) => {
-        let radioTowers = JSON.parse(radioTowerJson);
-        this.ExecuteCommand(new PluginCommand(Command.RadioTowerUpdate, this.ServerUniqueIdentifier, new RadioTower(radioTowers)));
+
+    OnUpdateRadioTowers = (RadioTowerJson) =>
+    {
+        this.RadioTowers = JSON.parse(RadioTowerJson);
+
+        alt.setTimeout(() => {
+            this.ExecuteCommand(new PluginCommand(Command.RadioTowerUpdate, this.ServerUniqueIdentifier, new RadioTower(this.RadioTowers)));
+        }, 3000);
     }
-    OnPluginConnected = () => {
+
+    OnSetDirect = bool =>
+    {
+        this.Direct = bool;
+    }
+
+    OnPluginConnected = () =>
+    {
         this.IsConnected = true;
         this.Initiate();
     }
-    OnPluginDisconnected = () => {
+
+    OnPluginDisconnected = () =>
+    {
         this.IsConnected = false;
     }
-    OnPluginMessage = (messageJson) => {
-        let message = JSON.parse(messageJson);
-        if (message.ServerUniqueIdentifier != this.ServerUniqueIdentifier)
-            return;
-        if (message.Command == Command.Ping && this.NextUpdate + 1000 > Date.now()) {
-            this.ExecuteCommand(new PluginCommand(Command.Pong, this.ServerUniqueIdentifier, null));
-            return;
-        }
-        if(message.Command == Command.TalkStateChange) {
-            this.OnPlayerTalking(message.Parameter.Name, message.Parameter.IsTalking)
-        }
-        if(message.Command == Command.StateUpdate) {
-            this.OnPlayerTalking(null, message.Parameter.IsTalking)
-        }
-        if (message.Parameter === typeof ('undefined') || message.Parameter == null)
-            return;
-        let parameter = message.Parameter;
-        if (parameter.IsReady && !this.IsInGame) {
-            alt.emitServer("SaltyChat_CheckVersion", parameter.UpdateBranch, parameter.Version);
-            this.IsInGame = parameter.IsReady;
-        }
-        /* if (parameter.IsTalking != this.IsTalking) {
-            this.IsTalking = parameter.IsTalking;
-            alt.emitServer("SaltyChat_IsTalking", this.IsTalking);
-        } */
-        if (parameter.IsMicrophoneMuted != this.IsMicrophoneMuted) {
-            this.IsMicrophoneMuted = parameter.IsMicrophoneMuted;
-        }
-        if (parameter.IsSoundMuted != this.IsSoundMuted) {
-            this.IsSoundMuted = parameter.IsSoundMuted;
+
+    OnPluginMessage = (messageJson) => 
+    {
+        const message = JSON.parse(messageJson);
+
+        if (message.ServerUniqueIdentifier != this.ServerUniqueIdentifier) return;
+        if (message.Parameter == null && message.Command > 2) return;
+
+        switch(message.Command) {
+            case Command.Reset:
+                this.IsInGame = false;
+                this.Initiate();
+                return;
+
+            case Command.Ping:
+                if(this.NextUpdate + 1000 < Date.now()) return;
+
+                this.ExecuteCommand(new PluginCommand(Command.Pong, this.ServerUniqueIdentifier, null));
+                return;
+
+            case Command.StateUpdate:
+                LogConsole("State Update");
+                if(message.Parameter.IsReady && !this.IsInGame) {
+                    alt.emitServer("SaltyChat_CheckVersion", message.Parameter.UpdateBranch, message.Parameter.Version);
+                    this.IsInGame = message.Parameter.IsReady;
+                }
+                this.IsMicrophoneMuted = message.Parameter.IsMicrophoneMuted;
+                this.IsSoundMuted = message.Parameter.IsSoundMuted;
+
+                if (message.Parameter.IsTalking)
+                    alt.emit('anim:playFacial', "mp_facial", "mic_chatter");
+                else
+                    alt.emit('anim:playFacial', "facials@gen_male@variations@normal", "mood_normal_1");
+                return;
+
+            case Command.TalkStateChange:
+                LogConsole(`TalkStateChange :: ${message.Parameter.Name} {${message.Parameter.IsTalking}}`);
+                let voiceClient = this.VoiceClients.find(x => x.TeamSpeakName == message.Parameter.Name);
+
+                if(voiceClient == null) return;
+
+                if(message.Parameter.IsTalking)
+                    alt.emit('anim:playFacial', "mp_facial", "mic_chatter", voiceClient.Player)
+                else
+                    alt.emit('anim:playFacial', "facials@gen_male@variations@normal", "mood_normal_1", voiceClient.Player)
+                return;
         }
     }
-    OnPluginError = (errorJson) => {
-        try {
+
+    OnPluginError = errorJson =>
+    {
+        try 
+        {
             let error = JSON.parse(errorJson);
-            if (error.Error == PluginError.AlreadyInGame) {
+            if (error.Error == PluginError.AlreadyInGame)
                 this.Initiate();
-            }
-            else {
-                alt.log("[Salty Chat] Error: " + error.Error + " | Message: " + error.Message);
-            }
+            else
+                LogConsole("[Salty Chat] Error: " + error.Error + " | Message: " + error.Message); 
         }
         catch {
-            alt.log("[Salty Chat] We got an error, but couldn't deserialize it...");
+            LogConsole("[Salty Chat] We got an error, but couldn't deserialize it...");
+            LogConsole("[Salty Chat] Json: " + errorJson);
         }
     }
-    OnTick = () => {
+
+    OnTick = () =>
+    {
         native.disableControlAction(1, 243, true);
         native.disableControlAction(1, 249, true);
-        if (this.IsConnected && this.IsInGame && Date.now() > this.NextUpdate) {
+        if(this.IsConnected && this.IsInGame && Date.now() > this.NextUpdate) {
             this.PlayerStateUpdate();
-            this.NextUpdate = Date.now() + 666;
+            this.NextUpdate = Date.now() + 500;
         }
-        if (this.RadioChannel != null) {
-            if (native.isDisabledControlJustPressed(1, 249))
-                alt.emitServer("SaltyChat_IsSending", this.RadioChannel, true);
-            else if (native.isDisabledControlJustReleased(1, 249))
-                alt.emitServer("SaltyChat_IsSending", this.RadioChannel, false);
-        }
+
+        let isInVehicle = (alt.Player.local.vehicle && RadioCars.includes(alt.Player.local.vehicle.model));
+
+        if (native.isDisabledControlJustPressed(1, 249))
+            alt.emitServer("SaltyChat_IsSending", this.RadioChannel, true, this.Direct, isInVehicle);
+        else if (native.isDisabledControlJustReleased(1, 249))
+            alt.emitServer("SaltyChat_IsSending", this.RadioChannel, false, this.Direct, isInVehicle);
+        
         if (native.isDisabledControlJustPressed(0, 243)) {
             this.ToggleVoiceRange();
         }
     }
-    PlaySound = (fileName, loop, handle) => {
+
+    PlaySound = (fileName, loop, handle) =>
+    {
         this.ExecuteCommand(new PluginCommand(Command.PlaySound, this.ServerUniqueIdentifier, new Sound(fileName, loop, handle)));
     }
-    StopSound = (handle) => {
+    StopSound = (handle) => 
+    {
         this.ExecuteCommand(new PluginCommand(Command.StopSound, this.ServerUniqueIdentifier, new Sound(handle, false, handle)));
     }
-    Initiate = () => {
-        if(this.IsEnabled) {
-            this.ExecuteCommand(new PluginCommand(Command.Initiate, this.ServerUniqueIdentifier, new GameInstance(this.ServerUniqueIdentifier, this.TeamSpeakName, this.IngameChannel, this.IngameChannelPassword, this.SoundPack)));
-            alt.emitServer("SaltyChat_SetVoiceRange", alt.Player.local, 3)
-        } else {
-            alt.setTimeout(() => {
-                this.Initiate()
-            }, 500);
+    Initiate = () =>
+    {
+        if(this.IsEnabled)
+        {
+            this.ExecuteCommand(new PluginCommand(Command.Initiate, this.ServerUniqueIdentifier, new GameInstance(this.ServerUniqueIdentifier, this.TeamSpeakName, this.IngameChannel, this.IngameChannelPassword, this.SoundPack, this.SwissChannelIds)));
         }
-    }
-    PlayerStateUpdate = () => {
-        let playerPosition = alt.Player.local.pos;
-        this.VoiceClients.forEach((voiceClient, playerId) => {
-            let nPlayerPosition = voiceClient.Player.pos;
-            this.ExecuteCommand(new PluginCommand(Command.PlayerStateUpdate, this.ServerUniqueIdentifier, new PlayerState(voiceClient.TeamSpeakName, nPlayerPosition, null, voiceClient.VoiceRange, voiceClient.IsAlive, null)));
-        });
-        this.ExecuteCommand(new PluginCommand(Command.SelfStateUpdate, this.ServerUniqueIdentifier, new PlayerState(null, playerPosition, native.getGameplayCamRot(0).z, null, false, null)));
-    }
-    ToggleVoiceRange = () => {
-        let index = VoiceManager.VoiceRanges.indexOf(this.VoiceRange);
-        let newIndex = null
-        if (index < 0)
-            newIndex = 1
-        else if (index + 1 >= VoiceManager.VoiceRanges.length)
-            newIndex = 0;
         else
-            newIndex = index + 1;
-
-        alt.emitServer("SaltyChat_SetVoiceRange", VoiceManager.VoiceRanges[newIndex]);
-    }
-    ExecuteCommand = (command) => {
-        if (this.IsEnabled && this.IsConnected) {
-            webView.emit("salty:runCommand", JSON.stringify(command));
+        {
+            alt.setTimeout(() =>
+            {
+                this.Initiate();
+            }, 500)
         }
+    }
+    PlayerStateUpdate = () =>
+    {
+        const VoiceClients = this.VoiceClients;
+        let UpdatedPlayer = 0;
+        let SkippedPlayer = [];
+        for(let i = 0; i < VoiceClients.length; i++)
+        {
+            if(!VoiceClients[i].Player || VoiceClients[i].Player.scriptID == 0) 
+            {
+                try {
+                    SkippedPlayer.push(VoiceClients[i].Player.Id)
+                } catch(e) {}
+                continue;
+            }
+
+            UpdatedPlayer++;
+
+            let NoLoS = !native.hasEntityClearLosToEntity(alt.Player.local.scriptID, VoiceClients[i].Player.scriptID, 17);
+            this.ExecuteCommand(new PluginCommand(Command.PlayerStateUpdate, this.ServerUniqueIdentifier, new PlayerState(VoiceClients[i].TeamSpeakName, VoiceClients[i].Player.pos, null, VoiceClients[i].VoiceRange, VoiceClients[i].IsAlive, 1.4, NoLoS)));
+        }
+        LogConsole(`Updated ${UpdatedPlayer}/${VoiceClients.length}`);
+        LogConsole(`${SkippedPlayer}`)
+        this.ExecuteCommand(new PluginCommand(Command.SelfStateUpdate, this.ServerUniqueIdentifier, new PlayerState(null, alt.Player.local.pos, native.getGameplayCamRot(0).z, null, false, null)));
+    }
+    ToggleVoiceRange = () =>
+    {
+        let index = this.VoiceRanges.indexOf(this.VoiceRange);
+
+        if(++index >= this.VoiceRanges.length) index = 0;
+
+        alt.emitServer("SaltyChat_SetVoiceRange", this.VoiceRanges[index]);
+    }
+    ExecuteCommand = (command) =>
+    {
+        if(!this.IsEnabled || !this.IsConnected) return;
+        webView.emit("salty:runCommand", JSON.stringify(command))
+    }
+    OnEntityLeftStreamingRange = (entity) =>
+    {
+        if(!(entity instanceof alt.Player)) return;
+        let voiceClient = this.VoiceClients.find(x => x.Player.id == entity.id);
+        if(voiceClient == null) return;
+        this.ExecuteCommand(new PluginCommand(Command.PlayerStateUpdate, this.ServerUniqueIdentifier, new PlayerState(voiceClient.TeamSpeakName, new alt.Vector3(0,0,0), null, voiceClient.VoiceRange, voiceClient.IsAlive, 1.4, false)));
     }
 }
 let voiceManager = new VoiceManager();
-VoiceManager.VoiceRanges = [3.0, 8.0, 15.0, 32.0];
 
+const RadioCars = [
+    native.getHashKey('police2'),
+    native.getHashKey('police3'),
+    native.getHashKey('fbi'),
+    native.getHashKey('policet'),
+    native.getHashKey('policeb'),
+    native.getHashKey('riot'),
+    native.getHashKey('ambulance'),
+    native.getHashKey('towtruck'),
+    native.getHashKey('towtruck2'),
+    native.getHashKey('firetruk'),
+    native.getHashKey('flatbed'),
+    native.getHashKey('utillitruck2'),
+    native.getHashKey('utillitruck3'),
+    native.getHashKey('taxi'),
+    native.getHashKey('baller6'),
+    native.getHashKey('police4')
+]
 
+alt.on('SaltyChat_setDirect', voiceManager.OnSetDirect);
+alt.on('gameEntityDestroy', voiceManager.OnEntityLeftStreamingRange);
 alt.onServer("SaltyChat_Initialize", voiceManager.OnInitialize); //(tsName, serverIdentifier, soundPack, ingameChannel, ingameChannelPassword));
 alt.onServer("SaltyChat_UpdateClient", voiceManager.OnUpdateVoiceClient); //(playerHandle, tsName, voiceRange));
 alt.onServer("SaltyChat_Disconnected", voiceManager.OnPlayerDisconnect); //(playerHandle));
@@ -410,15 +499,15 @@ alt.onServer("SaltyChat_PlayerDied", voiceManager.OnPlayerDied); //(playerHandle
 alt.onServer("SaltyChat_PlayerRevived", voiceManager.OnPlayerRevived); //(playerHandle));
 alt.onServer("SaltyChat_EstablishedCall", voiceManager.OnEstablishCall); //(playerHandle));
 alt.onServer("SaltyChat_EstablishedCallRelayed", voiceManager.OnEstablishCallRelayed); //(playerHandle, direct, relayJson));
-alt.onServer("SaltyChat_EndCall", voiceManager.OnEndCall); //(playerHandle));
+alt.onServer("SaltyChat_EndCall", voiceManager.OnEndCall); //(playerID));
 alt.onServer("SaltyChat_SetRadioChannel", voiceManager.OnSetRadioChannel); //(radioChannel));
 alt.onServer("SaltyChat_IsSending", voiceManager.OnPlayerIsSending); //(playerHandle, isOnRadio));
 alt.onServer("SaltyChat_IsSendingRelayed", voiceManager.OnPlayerIsSendingRelayed); //(playerHandle, isOnRadio, stateChange, direct, relayJson));
 alt.onServer("SaltyChat_UpdateRadioTowers", voiceManager.OnUpdateRadioTowers); //(radioTowerJson));
+webView.on("SaltyChat_OnConnected", voiceManager.OnPluginConnected); //());
 webView.on("SaltyChat_OnDisconnected", voiceManager.OnPluginDisconnected); //());
 webView.on("SaltyChat_OnMessage", voiceManager.OnPluginMessage); //(messageJson));
 webView.on("SaltyChat_OnError", voiceManager.OnPluginError); //(errorJson));
-webview.on("SaltyChat_OnConnected", voiceManager.OnPluginConnected); //());
 alt.onServer("SaltyChat_OnDisconnected", voiceManager.OnPluginDisconnected); //());
 alt.onServer("SaltyChat_OnMessage", voiceManager.OnPluginMessage); //(messageJson));
 alt.onServer("SaltyChat_OnError", voiceManager.OnPluginError); //(errorJson));
