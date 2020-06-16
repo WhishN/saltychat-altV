@@ -203,7 +203,7 @@ class VoiceManager {
         let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
         if(index < 0) return;
 		
-		LogConsole(`Voice Client ${this.VoiceClient[index].TeamSpeakName} died`)
+		LogConsole(`Voice Client ${this.VoiceClients[index].TeamSpeakName} died`)
 
         this.VoiceClients[index].isAlive = false;
     }
@@ -213,7 +213,7 @@ class VoiceManager {
         let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
         if(index < 0) return;
 	
-		LogConsole(`Voice Client ${this.VoiceClient[index].TeamSpeakName} revived`)
+		LogConsole(`Voice Client ${this.VoiceClients[index].TeamSpeakName} revived`)
 
         this.VoiceClients[index].isAlive = true;
     }
@@ -222,7 +222,7 @@ class VoiceManager {
         let index = this.VoiceClients.findIndex(x => x.Player.id == player.id);
         if(index < 0) return;
 		
-		LogConsole(`Voice Client ${this.VoiceClient[index].TeamSpeakName} Call`)
+		LogConsole(`Voice Client ${this.VoiceClients[index].TeamSpeakName} Call`)
 
         this.ExecuteCommand(new PluginCommand(Command.PhoneCommunicationUpdate, this.ServerUniqueIdentifier, new PhoneCommunication(this.VoiceClients[index].TeamSpeakName, 0, 1.4, true, null)));
     }
