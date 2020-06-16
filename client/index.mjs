@@ -274,12 +274,12 @@ class VoiceManager {
 
                 LogConsole(`Funkverbindung: ME[${ownType}] - OTHER[${otherType}]`)
 
-                native.playSoundFromEntity(-1, "Start_Squelch", voiceClient.Player.scriptID, "CB_RADIO_SFX", true, undefined)
+                native.playSoundFromEntity(-1, "Start_Squelch", this.VoiceClients[index].Player.scriptID, "CB_RADIO_SFX", true, undefined)
                 this.ExecuteCommand(new PluginCommand(Command.RadioCommunicationUpdate, this.ServerUniqueIdentifier, new RadioCommunication(this.VoiceClients[index].TeamSpeakName, OwnType, OtherType , false, null, true, null)))
             }
             else
             {
-                native.playSoundFromEntity(-1, "End_Squelch", voiceClient.Player.scriptID, "CB_RADIO_SFX", true, undefined)
+                native.playSoundFromEntity(-1, "End_Squelch", this.VoiceClients[index].Player.scriptID, "CB_RADIO_SFX", true, undefined)
                 this.ExecuteCommand(new PluginCommand(Command.StopRadioCommunication, this.ServerUniqueIdentifier, new RadioCommunication(this.VoiceClients[index].TeamSpeakName, RadioType.None, RadioType.None, false, null, true, null)))
             }
         }
