@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -34,26 +34,28 @@ namespace SaltyChatServer
         [ServerEvent("StartServer")]
         public void StartServer()
         {
-            VoiceManager.ServerUniqueIdentifier = SharedData.ServerUniqueIdentifier;
-            VoiceManager.RequiredUpdateBranch = SharedData.RequiredUpdateBranch;
-            VoiceManager.MinimumPluginVersion = SharedData.MinimumPluginVersion;
-            VoiceManager.SoundPack = SharedData.SoundPack;
-            VoiceManager.IngameChannel = SharedData.IngameChannel;
-            VoiceManager.IngameChannelPassword = SharedData.IngameChannelPassword;
+            ServerUniqueIdentifier = SharedData.ServerUniqueIdentifier;
+            RequiredUpdateBranch = SharedData.RequiredUpdateBranch;
+            MinimumPluginVersion = SharedData.MinimumPluginVersion;
+            SoundPack = SharedData.SoundPack;
+            IngameChannel = SharedData.IngameChannel;
+            IngameChannelPassword = SharedData.IngameChannelPassword;
         }
 
         [ServerEvent("PlayerLoggedIn")]
-        public void OnPlayerConnected(IPlayer client, string reason)
+        public void OnPlayerConnected(IPlayer client, string playerName = "")
         {
-            VoiceClient voiceClient = new VoiceClient(client, VoiceManager.GetTeamSpeakName(), SharedData.VoiceRanges[0]);
+            VoiceClient voiceClient = new VoiceClient(client, GetTeamSpeakName(), SharedData.VoiceRanges[0]);
 
-            lock (VoiceManager.VoiceClients)
+            lock (VoiceClients)
             {
-                VoiceManager.VoiceClients.Add(client, voiceClient);
+                VoiceClients.Add(client, voiceClient);
             }
-            //Console.WriteLine($"{client} connected");
 
-            client.Emit(Event.SaltyChat_Initialize, voiceClient.TeamSpeakName, VoiceManager.ServerUniqueIdentifier, VoiceManager.SoundPack, VoiceManager.IngameChannel, VoiceManager.IngameChannelPassword);
+            if (string.IsNullOrEmpty(playerName))
+                playerName = voiceClient.TeamSpeakName;
+
+            client.Emit(Event.SaltyChat_Initialize, playerName, ServerUniqueIdentifier, SoundPack, IngameChannel, IngameChannelPassword);
         }
 
         [ScriptEvent(ScriptEventType.PlayerDisconnect)]
@@ -61,20 +63,20 @@ namespace SaltyChatServer
         {
             VoiceClient voiceClient;
 
-            lock (VoiceManager.VoiceClients)
+            lock (VoiceClients)
             {
-                if (!VoiceManager.VoiceClients.TryGetValue(client, out voiceClient))
+                if (!VoiceClients.TryGetValue(client, out voiceClient))
                     return;
 
-                VoiceManager.VoiceClients.Remove(client);
+                VoiceClients.Remove(client);
             }
 
-            foreach (RadioChannel radioChannel in VoiceManager.RadioChannels.Where(c => c.IsMember(voiceClient)))
+            foreach (RadioChannel radioChannel in RadioChannels.Where(c => c.IsMember(voiceClient)))
             {
                 radioChannel.RemoveMember(voiceClient);
             }
 
-            foreach (VoiceClient cl in VoiceManager.VoiceClients.Values)
+            foreach (VoiceClient cl in VoiceClients.Values)
             {
                 cl.Player.Emit(Event.SaltyChat_Disconnected, voiceClient.Player.Id);
             }
@@ -88,17 +90,16 @@ namespace SaltyChatServer
 
             Console.WriteLine($"Checked Version for Player #{player.Id}");
 
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-
-            if (!VoiceManager.IsVersionAccepted(branch, version))
+            if (!IsVersionAccepted(branch, version))
             {
-                player.Kick($"[Salty Chat] Required Branch: {VoiceManager.RequiredUpdateBranch} | Required Version: {VoiceManager.MinimumPluginVersion}");
+                player.Kick($"[Salty Chat] Required Branch: {RequiredUpdateBranch} | Required Version: {MinimumPluginVersion}");
                 return;
             }
 
-            foreach (VoiceClient cl in VoiceManager.VoiceClients.Values)
+            foreach (VoiceClient cl in VoiceClients.Values)
             {
                 player.Emit(Event.SaltyChat_UpdateClient, cl.Player.Id, cl.TeamSpeakName, cl.VoiceRange);
 
@@ -110,32 +111,38 @@ namespace SaltyChatServer
         [ClientEvent(Event.SaltyChat_IsTalking)]
         public void OnIsTalking(IPlayer player, bool isTalking)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out _))
                 return;
 
-            foreach (VoiceClient client in VoiceManager.VoiceClients.Values)
+            foreach (VoiceClient client in VoiceClients.Values)
             {
                 client.Player.Emit(Event.SaltyChat_IsTalking, player.Id, isTalking);
             }
         }
 
-        [ClientEvent(Event.SaltyChat_SetVoiceRange)]
-        public void OnSetVoiceRange(IPlayer player, int range)
+        [ServerEvent(Event.SaltyChat_SetVoiceRange)]
+        public void OnSetVoiceRange(IPlayer player, string range)
         {
-            float voiceRange = (float) range;
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            float voiceRange;
+
+            voiceRange = 8.0f;
+
+            if (range == "Weit")
+                voiceRange = 22.0f;
+
+            else if (range == "Kurz")
+                voiceRange = 2.0f;
+
+            Console.WriteLine("VOICE RANGE TEST: " + voiceRange);
+
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            //Console.WriteLine("Set Voice Range for Player");
+            voiceClient.VoiceRange = voiceRange;
 
-            if (Array.IndexOf(SharedData.VoiceRanges, voiceRange) >= 0)
+            foreach (VoiceClient client in VoiceClients.Values)
             {
-                voiceClient.VoiceRange = voiceRange;
-
-                foreach (VoiceClient client in VoiceManager.VoiceClients.Values)
-                {
-                    client.Player.Emit(Event.SaltyChat_UpdateClient, player.Id, voiceClient.TeamSpeakName, voiceClient.VoiceRange);
-                }
+                client.Player.Emit(Event.SaltyChat_UpdateClient, player.Id, voiceClient.TeamSpeakName, voiceClient.VoiceRange);
             }
         }
         #endregion
@@ -145,9 +152,9 @@ namespace SaltyChatServer
         [ClientEvent("speaker")]
         public void OnSetRadioSpeaker(IPlayer player, string toggleString)
         {
-            bool toggle = String.Equals(toggleString, "true", StringComparison.OrdinalIgnoreCase);
+            bool toggle = string.Equals(toggleString, "true", StringComparison.OrdinalIgnoreCase);
 
-            VoiceManager.SetRadioSpeaker(player, toggle);
+            SetRadioSpeaker(player, toggle);
 
             //player.SendChatMessage("Speaker", $"The speaker is now {(toggle ? "on" : "off")}.");
         }
@@ -155,7 +162,7 @@ namespace SaltyChatServer
         [ClientEvent("joinradio")]
         public void OnJoinRadioChannel(IPlayer player, string channelName)
         {
-            VoiceManager.JoinRadioChannel(player, channelName);
+            JoinRadioChannel(player, channelName);
 
             //player.SendChatMessage("Radio", $"You joined channel \"{channelName}\".");
         }
@@ -163,7 +170,7 @@ namespace SaltyChatServer
         [ClientEvent("leaveradio")]
         public void OnLeaveRadioChannel(IPlayer player, string channelName)
         {
-            VoiceManager.LeaveRadioChannel(player, channelName);
+            LeaveRadioChannel(player, channelName);
 
             //player.SendChatMessage("Radio", $"You left channel \"{channelName}\".");
         }
@@ -174,10 +181,10 @@ namespace SaltyChatServer
         [ClientEvent(Event.SaltyChat_IsSending)]
         public void OnSendingOnRadio(IPlayer player, string radioChannelName, bool isSending)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            RadioChannel radioChannel = VoiceManager.GetRadioChannel(radioChannelName, false);
+            RadioChannel radioChannel = GetRadioChannel(radioChannelName, false);
 
             if (radioChannel == null || !radioChannel.IsMember(voiceClient))
                 return;
@@ -191,15 +198,15 @@ namespace SaltyChatServer
         {
             RadioChannel radioChannel;
 
-            lock (VoiceManager.RadioChannels)
+            lock (RadioChannels)
             {
-                radioChannel = VoiceManager.RadioChannels.FirstOrDefault(r => r.Name == name);
+                radioChannel = RadioChannels.FirstOrDefault(r => r.Name == name);
 
                 if (radioChannel == null && create)
                 {
                     radioChannel = new RadioChannel(name);
 
-                    VoiceManager.RadioChannels.Add(radioChannel);
+                    RadioChannels.Add(radioChannel);
                 }
             }
 
@@ -208,7 +215,7 @@ namespace SaltyChatServer
 
         public static void SetRadioSpeaker(IPlayer player, bool toggle)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
             voiceClient.RadioSpeaker = toggle;
@@ -216,37 +223,37 @@ namespace SaltyChatServer
 
         public static void JoinRadioChannel(IPlayer player, string radioChannelName)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            foreach (RadioChannel channel in VoiceManager.RadioChannels)
+            foreach (RadioChannel channel in RadioChannels)
             {
                 if (channel.IsMember(voiceClient))
                     return;
             }
 
-            RadioChannel radioChannel = VoiceManager.GetRadioChannel(radioChannelName, true);
+            RadioChannel radioChannel = GetRadioChannel(radioChannelName, true);
 
             radioChannel.AddMember(voiceClient);
         }
 
         public static void LeaveRadioChannel(IPlayer player)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            foreach (RadioChannel radioChannel in VoiceManager.RadioChannels.Where(r => r.IsMember(voiceClient)))
+            foreach (RadioChannel radioChannel in RadioChannels.Where(r => r.IsMember(voiceClient)))
             {
-                VoiceManager.LeaveRadioChannel(player, radioChannel.Name);
+                LeaveRadioChannel(player, radioChannel.Name);
             }
         }
 
         public static void LeaveRadioChannel(IPlayer player, string radioChannelName)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            RadioChannel radioChannel = VoiceManager.GetRadioChannel(radioChannelName, false);
+            RadioChannel radioChannel = GetRadioChannel(radioChannelName, false);
 
             if (radioChannel != null)
             {
@@ -254,17 +261,17 @@ namespace SaltyChatServer
 
                 if (radioChannel.Members.Count == 0)
                 {
-                    VoiceManager.RadioChannels.Remove(radioChannel);
+                    RadioChannels.Remove(radioChannel);
                 }
             }
         }
 
         public static void SendingOnRadio(IPlayer player, string radioChannelName, bool isSending)
         {
-            if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
+            if (!TryGetVoiceClient(player, out VoiceClient voiceClient))
                 return;
 
-            RadioChannel radioChannel = VoiceManager.GetRadioChannel(radioChannelName, false);
+            RadioChannel radioChannel = GetRadioChannel(radioChannelName, false);
 
             if (radioChannel == null || !radioChannel.IsMember(voiceClient))
                 return;
@@ -278,7 +285,7 @@ namespace SaltyChatServer
         {
             string name;
 
-            lock (VoiceManager.VoiceClients)
+            lock (VoiceClients)
             {
                 do
                 {
@@ -289,7 +296,7 @@ namespace SaltyChatServer
                         name = name.Remove(29, name.Length - 30);
                     }
                 }
-                while (VoiceManager.VoiceClients.Values.Any(c => c.TeamSpeakName == name));
+                while (VoiceClients.Values.Any(c => c.TeamSpeakName == name));
             }
 
             return name;
@@ -297,16 +304,16 @@ namespace SaltyChatServer
 
         public static bool IsVersionAccepted(string branch, string version)
         {
-            if (!String.IsNullOrWhiteSpace(VoiceManager.RequiredUpdateBranch) && VoiceManager.RequiredUpdateBranch != branch)
+            if (!string.IsNullOrWhiteSpace(RequiredUpdateBranch) && RequiredUpdateBranch != branch)
             {
                 return false;
             }
 
-            if (!String.IsNullOrWhiteSpace(VoiceManager.MinimumPluginVersion))
+            if (!string.IsNullOrWhiteSpace(MinimumPluginVersion))
             {
                 try
                 {
-                    string[] minimumVersionArray = VoiceManager.MinimumPluginVersion.Split('.');
+                    string[] minimumVersionArray = MinimumPluginVersion.Split('.');
                     string[] versionArray = version.Split('.');
 
                     int lengthCounter = 0;
@@ -348,9 +355,9 @@ namespace SaltyChatServer
         #region Helper
         public static bool TryGetVoiceClient(IPlayer client, out VoiceClient voiceClient)
         {
-            lock (VoiceManager.VoiceClients)
+            lock (VoiceClients)
             {
-                if (VoiceManager.VoiceClients.TryGetValue(client, out voiceClient))
+                if (VoiceClients.TryGetValue(client, out voiceClient))
                     return true;
             }
 
