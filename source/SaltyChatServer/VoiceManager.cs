@@ -45,19 +45,29 @@ namespace SaltyChatServer
         [ServerEvent("PlayerLoggedIn")]
         public void OnPlayerLoggedIn(IPlayer client, string playerName = "")
         {
-            VoiceClient voiceClient = new VoiceClient(client, VoiceManager.GetTeamSpeakName(), SharedData.VoiceRanges[0]);
+            var tsName = VoiceManager.GetTeamSpeakName();
+            
+            VoiceClient voiceClient;
+            
+            if (String.IsNullOrEmpty(playerName))
+                voiceClient = new VoiceClient(client, tsName, SharedData.VoiceRanges[0]);
+            else
+            {
+                var checkname = VoiceManager.VoiceClients.Values.FirstOrDefault(x => x.TeamSpeakName == playerName);
+                if (checkname == null)
+                    voiceClient = new VoiceClient(client, playerName, SharedData.VoiceRanges[0]);
+                else
+                    voiceClient = new VoiceClient(client, tsName, SharedData.VoiceRanges[0]);
+            }
 
             lock (VoiceManager.VoiceClients)
             {
                 VoiceManager.VoiceClients.Add(client, voiceClient);
             }
-            
-            if (String.IsNullOrEmpty(playerName))
-                playerName = voiceClient.TeamSpeakName;
-            
-            //Console.WriteLine($"{client} connected");
 
-            client.Emit(Event.SaltyChat_Initialize, playerName, VoiceManager.ServerUniqueIdentifier, VoiceManager.SoundPack, VoiceManager.IngameChannel, VoiceManager.IngameChannelPassword);
+            client.Emit(Event.SaltyChat_Initialize, voiceClient.TeamSpeakName, VoiceManager.ServerUniqueIdentifier, VoiceManager.SoundPack, VoiceManager.IngameChannel, VoiceManager.IngameChannelPassword);
+        
+            //Console.WriteLine($"{client} connected");
         }
 
         [ScriptEvent(ScriptEventType.PlayerDisconnect)]
