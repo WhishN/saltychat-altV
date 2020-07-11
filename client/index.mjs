@@ -418,7 +418,7 @@ alt.onServer("SaltyChat_UpdateRadioTowers", voiceManager.OnUpdateRadioTowers); /
 webView.on("SaltyChat_OnDisconnected", voiceManager.OnPluginDisconnected); //());
 webView.on("SaltyChat_OnMessage", voiceManager.OnPluginMessage); //(messageJson));
 webView.on("SaltyChat_OnError", voiceManager.OnPluginError); //(errorJson));
-webview.on("SaltyChat_OnConnected", voiceManager.OnPluginConnected); //());
+webView.on("SaltyChat_OnConnected", voiceManager.OnPluginConnected); //());
 alt.onServer("SaltyChat_OnDisconnected", voiceManager.OnPluginDisconnected); //());
 alt.onServer("SaltyChat_OnMessage", voiceManager.OnPluginMessage); //(messageJson));
 alt.onServer("SaltyChat_OnError", voiceManager.OnPluginError); //(errorJson));
