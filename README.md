@@ -1,7 +1,7 @@
 # saltychat-altV
 alt:V Version of Saltychat Plugin using C# Serverside
 
-# This version wonng get any Updates but Pull Requests will be merged.
+# This version wint get any Updates by me but Pull Requests will be merged.
 
 
 Fill in Serverside required Settings, compile the Serverside and add it to your server
