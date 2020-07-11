@@ -43,17 +43,31 @@ namespace SaltyChatServer
         }
 
         [ServerEvent("PlayerLoggedIn")]
-        public void OnPlayerConnected(IPlayer client, string reason)
+        public void OnPlayerLoggedIn(IPlayer client, string playerName = "")
         {
-            VoiceClient voiceClient = new VoiceClient(client, VoiceManager.GetTeamSpeakName(), SharedData.VoiceRanges[0]);
+            var tsName = VoiceManager.GetTeamSpeakName();
+            
+            VoiceClient voiceClient;
+            
+            if (String.IsNullOrEmpty(playerName))
+                voiceClient = new VoiceClient(client, tsName, SharedData.VoiceRanges[0]);
+            else
+            {
+                var checkname = VoiceManager.VoiceClients.Values.FirstOrDefault(x => x.TeamSpeakName == playerName);
+                if (checkname == null)
+                    voiceClient = new VoiceClient(client, playerName, SharedData.VoiceRanges[0]);
+                else
+                    voiceClient = new VoiceClient(client, tsName, SharedData.VoiceRanges[0]);
+            }
 
             lock (VoiceManager.VoiceClients)
             {
                 VoiceManager.VoiceClients.Add(client, voiceClient);
             }
-            //Console.WriteLine($"{client} connected");
 
             client.Emit(Event.SaltyChat_Initialize, voiceClient.TeamSpeakName, VoiceManager.ServerUniqueIdentifier, VoiceManager.SoundPack, VoiceManager.IngameChannel, VoiceManager.IngameChannelPassword);
+        
+            //Console.WriteLine($"{client} connected");
         }
 
         [ScriptEvent(ScriptEventType.PlayerDisconnect)]
@@ -85,7 +99,6 @@ namespace SaltyChatServer
         [ClientEvent(Event.SaltyChat_CheckVersion)]
         public void OnCheckVersion(IPlayer player, string branch, string version)
         {
-
             Console.WriteLine($"Checked Version for Player #{player.Id}");
 
             if (!VoiceManager.TryGetVoiceClient(player, out VoiceClient voiceClient))
@@ -101,7 +114,6 @@ namespace SaltyChatServer
             foreach (VoiceClient cl in VoiceManager.VoiceClients.Values)
             {
                 player.Emit(Event.SaltyChat_UpdateClient, cl.Player.Id, cl.TeamSpeakName, cl.VoiceRange);
-
             }
 
             Alt.EmitAllClients(Event.SaltyChat_UpdateClient, voiceClient.Player.Id, voiceClient.TeamSpeakName, voiceClient.VoiceRange);
